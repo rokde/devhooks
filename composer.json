@@ -1,0 +1,17 @@
+{
+    "name": "rokde/devhooks",
+    "description": "Lightweight git hooks runner: fast pre-commit on changed files, full pre-push with main-divergence check",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.1"
+    },
+    "bin": [
+        "bin/devhooks"
+    ],
+    "extra": {
+        "branch-alias": {
+            "dev-main": "1.x-dev"
+        }
+    }
+}
