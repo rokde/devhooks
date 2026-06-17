@@ -110,6 +110,24 @@ tests/Feature/Foo/BarTest.php
 
 If no test file is found the Pest run is skipped for that file.
 
+## Bypassing failed checks
+
+If any check fails, devhooks asks for confirmation instead of aborting silently:
+
+```
+  ✗ pre-commit checks failed
+  Commit anyway? [y/N]
+```
+
+```
+  ✗ pre-push checks failed
+  Push anyway? [y/N]
+```
+
+Answering `y` lets the commit or push proceed despite the failure. Anything
+else aborts. This gives you an escape hatch when you need to commit
+work-in-progress or push urgently without fixing all issues first.
+
 ## Main-divergence check (pre-push)
 
 When pushing from any branch other than `main`, devhooks fetches
