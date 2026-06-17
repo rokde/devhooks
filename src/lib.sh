@@ -208,3 +208,25 @@ dh_run() {
         return 1
     fi
 }
+
+# dh_run_pest <label> [pest args...]
+# Like dh_run but treats "no tests found" / "directory not found" as a skip.
+dh_run_pest() {
+    _label="$1"
+    shift
+    dh_step "$_label"
+    _output="$("$@" 2>&1)" && _exit=0 || _exit=$?
+    printf '%s\n' "$_output"
+    if [ "$_exit" -eq 0 ]; then
+        dh_ok "$_label passed"
+        return 0
+    fi
+    # Pest exits non-zero when a test directory does not exist or no tests match.
+    # Treat these as "nothing to run" rather than failures.
+    if printf '%s' "$_output" | grep -qE 'not found\.|No tests found|no tests'; then
+        dh_skip "$_label (no tests found)"
+        return 0
+    fi
+    dh_error "$_label failed"
+    return 1
+}
