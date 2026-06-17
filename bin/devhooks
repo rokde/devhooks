@@ -2,6 +2,7 @@
 # devhooks - git hooks runner
 # Usage: devhooks <command>
 #   init        Install git hooks into .git/hooks/
+#   remove      Remove devhooks-managed hooks from .git/hooks/
 #   pre-commit  Run fast checks on changed files
 #   pre-push    Run full checks + main-divergence check
 
@@ -31,12 +32,12 @@ case "$COMMAND" in
         HOOKS_DIR="$PROJECT_ROOT/.git/hooks"
 
         # Determine how devhooks will be called from the hook scripts.
-        # If vendor/bin/devhooks exists relative to project root, prefer that.
-        # Otherwise fall back to the absolute path of this binary.
+        # 1. Project-local install (composer require --dev)
+        # 2. Global install: rely on devhooks being available in $PATH
         if [ -f "$PROJECT_ROOT/vendor/bin/devhooks" ]; then
             DEVHOOKS_CALL='vendor/bin/devhooks'
         else
-            DEVHOOKS_CALL="$SELF"
+            DEVHOOKS_CALL='devhooks'
         fi
 
         write_hook() {
@@ -64,6 +65,35 @@ EOF
         echo "devhooks: done. Run 'devhooks init' again at any time to update."
         ;;
 
+    remove)
+        PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
+        if [ -z "$PROJECT_ROOT" ]; then
+            echo "error: not inside a git repository" >&2
+            exit 1
+        fi
+
+        HOOKS_DIR="$PROJECT_ROOT/.git/hooks"
+
+        remove_hook() {
+            HOOK_FILE="$HOOKS_DIR/$1"
+            if [ ! -f "$HOOK_FILE" ]; then
+                echo "  $1 not found — skipping"
+                return
+            fi
+            if grep -q 'devhooks' "$HOOK_FILE" 2>/dev/null; then
+                rm "$HOOK_FILE"
+                echo "  removed $HOOK_FILE"
+            else
+                echo "  warning: $HOOK_FILE was not written by devhooks — skipping"
+            fi
+        }
+
+        echo "devhooks: removing git hooks from $HOOKS_DIR"
+        remove_hook "pre-commit"
+        remove_hook "pre-push"
+        echo "devhooks: uninstalled."
+        ;;
+
     pre-commit)
         . "$DEVHOOKS_SRC_DIR/lib.sh"
         . "$DEVHOOKS_SRC_DIR/pre-commit.sh"
@@ -81,6 +111,7 @@ EOF
         echo ""
         echo "Commands:"
         echo "  init        Install pre-commit and pre-push hooks into .git/hooks/"
+        echo "  remove      Remove devhooks-managed hooks from .git/hooks/"
         echo "  pre-commit  Run fast checks on staged/changed files only"
         echo "  pre-push    Run full suite + check for diverged main branch"
         echo ""
