@@ -1,0 +1,92 @@
+#!/usr/bin/env sh
+# devhooks - git hooks runner
+# Usage: devhooks <command>
+#   init        Install git hooks into .git/hooks/
+#   pre-commit  Run fast checks on changed files
+#   pre-push    Run full checks + main-divergence check
+
+set -e
+
+# Resolve the directory where this script lives, following symlinks
+SELF="$(readlink -f "$0" 2>/dev/null || realpath "$0" 2>/dev/null || echo "$0")"
+DEVHOOKS_BIN_DIR="$(dirname "$SELF")"
+DEVHOOKS_SRC_DIR="$DEVHOOKS_BIN_DIR/../src"
+
+# If installed via composer, src/ is one level up from vendor/bin/
+if [ ! -d "$DEVHOOKS_SRC_DIR" ]; then
+    DEVHOOKS_SRC_DIR="$DEVHOOKS_BIN_DIR/../vendor/rokde/devhooks/src"
+fi
+
+COMMAND="${1:-}"
+
+case "$COMMAND" in
+    init)
+        # Find project root (where .git lives)
+        PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
+        if [ -z "$PROJECT_ROOT" ]; then
+            echo "error: not inside a git repository" >&2
+            exit 1
+        fi
+
+        HOOKS_DIR="$PROJECT_ROOT/.git/hooks"
+
+        # Determine how devhooks will be called from the hook scripts.
+        # If vendor/bin/devhooks exists relative to project root, prefer that.
+        # Otherwise fall back to the absolute path of this binary.
+        if [ -f "$PROJECT_ROOT/vendor/bin/devhooks" ]; then
+            DEVHOOKS_CALL='vendor/bin/devhooks'
+        else
+            DEVHOOKS_CALL="$SELF"
+        fi
+
+        write_hook() {
+            HOOK_FILE="$HOOKS_DIR/$1"
+            HOOK_CMD="$2"
+            if [ -f "$HOOK_FILE" ] && ! grep -q 'devhooks' "$HOOK_FILE" 2>/dev/null; then
+                echo "warning: $HOOK_FILE already exists and was not written by devhooks — skipping."
+                echo "         Add the following line manually:"
+                echo "           $DEVHOOKS_CALL $HOOK_CMD"
+                return
+            fi
+            cat > "$HOOK_FILE" <<EOF
+#!/usr/bin/env sh
+# Managed by devhooks — re-run 'devhooks init' to update
+set -e
+$DEVHOOKS_CALL $HOOK_CMD
+EOF
+            chmod +x "$HOOK_FILE"
+            echo "  wrote $HOOK_FILE"
+        }
+
+        echo "devhooks: initialising git hooks in $HOOKS_DIR"
+        write_hook "pre-commit" "pre-commit"
+        write_hook "pre-push"   "pre-push"
+        echo "devhooks: done. Run 'devhooks init' again at any time to update."
+        ;;
+
+    pre-commit)
+        . "$DEVHOOKS_SRC_DIR/lib.sh"
+        . "$DEVHOOKS_SRC_DIR/pre-commit.sh"
+        ;;
+
+    pre-push)
+        . "$DEVHOOKS_SRC_DIR/lib.sh"
+        . "$DEVHOOKS_SRC_DIR/pre-push.sh"
+        ;;
+
+    *)
+        echo "devhooks — git hooks runner"
+        echo ""
+        echo "Usage: devhooks <command>"
+        echo ""
+        echo "Commands:"
+        echo "  init        Install pre-commit and pre-push hooks into .git/hooks/"
+        echo "  pre-commit  Run fast checks on staged/changed files only"
+        echo "  pre-push    Run full suite + check for diverged main branch"
+        echo ""
+        if [ -n "$COMMAND" ]; then
+            echo "Unknown command: $COMMAND" >&2
+            exit 1
+        fi
+        ;;
+esac
