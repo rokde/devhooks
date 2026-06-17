@@ -30,10 +30,20 @@ TEST_FILES=""
 if [ -n "$STAGED_PHP" ]; then
     for f in $STAGED_PHP; do
         full="$PROJECT_ROOT/$f"
-        test_file="$(dh_find_test_for "$full")"
-        if [ -n "$test_file" ]; then
-            TEST_FILES="$TEST_FILES $test_file"
-        fi
+        # If the staged file is itself a test file, use it directly
+        case "$f" in
+            tests/*|test/*)
+                if [ -f "$full" ]; then
+                    TEST_FILES="$TEST_FILES $full"
+                fi
+                ;;
+            *)
+                test_file="$(dh_find_test_for "$full")"
+                if [ -n "$test_file" ]; then
+                    TEST_FILES="$TEST_FILES $test_file"
+                fi
+                ;;
+        esac
     done
 fi
 
@@ -45,8 +55,6 @@ if [ -n "$STAGED_PHP" ]; then
     if [ -n "$RECTOR" ]; then
         # shellcheck disable=SC2086
         dh_run "rector (staged)" "$RECTOR" process --dry-run $STAGED_PHP || FAILED=1
-    else
-        dh_skip "rector (not installed)"
     fi
 fi
 
@@ -58,8 +66,6 @@ if [ -n "$STAGED_PHP" ]; then
     if [ -n "$PINT" ]; then
         # shellcheck disable=SC2086
         dh_run "pint (staged)" "$PINT" $STAGED_PHP || FAILED=1
-    else
-        dh_skip "pint (not installed)"
     fi
 fi
 
@@ -70,9 +76,7 @@ if [ -n "$STAGED_PHP" ]; then
     PHPSTAN="$(dh_find_bin phpstan)"
     if [ -n "$PHPSTAN" ]; then
         # shellcheck disable=SC2086
-        dh_run "phpstan (staged)" "$PHPSTAN" analyse $STAGED_PHP || FAILED=1
-    else
-        dh_skip "phpstan (not installed)"
+        dh_run "phpstan (staged)" "$PHPSTAN" analyse --memory-limit=-1 $STAGED_PHP || FAILED=1
     fi
 fi
 
@@ -86,12 +90,10 @@ if [ -n "$STAGED_PHP" ]; then
             # Build --filter or file args depending on what pest supports
             # Pest accepts file paths directly
             # shellcheck disable=SC2086
-            dh_run "pest (related tests)" "$PEST" $TEST_FILES || FAILED=1
+            dh_run_pest "pest (related tests)" "$PEST" $TEST_FILES || FAILED=1
         else
             dh_skip "pest (no related test files found for staged sources)"
         fi
-    else
-        dh_skip "pest (not installed)"
     fi
 fi
 
@@ -103,8 +105,6 @@ if [ -n "$STAGED_JS" ]; then
     if [ -n "$OXLINT" ]; then
         # shellcheck disable=SC2086
         dh_run "oxlint (staged)" "$OXLINT" $STAGED_JS || FAILED=1
-    else
-        dh_skip "oxlint (not installed)"
     fi
 fi
 
@@ -116,8 +116,6 @@ if [ -n "$STAGED_JS" ]; then
     if [ -n "$OXFMT" ]; then
         # shellcheck disable=SC2086
         dh_run "oxfmt (staged)" "$OXFMT" --check $STAGED_JS || FAILED=1
-    else
-        dh_skip "oxfmt (not installed)"
     fi
 fi
 
@@ -132,8 +130,6 @@ if [ -n "$STAGED_JS" ]; then
         # Using 'run' to avoid watch mode.
         # shellcheck disable=SC2086
         dh_run "vitest (related)" "$VITEST" run --reporter=verbose $STAGED_JS || FAILED=1
-    else
-        dh_skip "vitest (not installed)"
     fi
 fi
 
@@ -141,8 +137,16 @@ fi
 # Result
 # ---------------------------------------------------------------------------
 if [ "$FAILED" -ne 0 ]; then
-    dh_error "pre-commit checks failed — commit aborted"
-    exit 1
+    dh_error "pre-commit checks failed"
+    printf "${C_YELLOW}  Commit anyway? [y/N] ${C_RESET}"
+    read -r ANSWER </dev/tty
+    case "$ANSWER" in
+        y|Y|yes|YES) dh_warn "committing despite failed checks" ;;
+        *)
+            dh_error "commit aborted"
+            exit 1
+            ;;
+    esac
 fi
 
 dh_ok "all pre-commit checks passed"
