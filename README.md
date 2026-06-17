@@ -9,26 +9,50 @@ Detects installed tools automatically from `vendor/bin/` and `node_modules/.bin/
 
 ## Installation
 
+### Per-project (recommended)
+
 ```bash
 composer require --dev rokde/devhooks
 vendor/bin/devhooks init
 ```
 
-`init` writes `.git/hooks/pre-commit` and `.git/hooks/pre-push` and can be re-run at any time to update the hooks to the latest version.
+### Global
+
+Install once and use across all projects without adding it to each `composer.json`:
+
+```bash
+composer global require rokde/devhooks
+devhooks init
+```
+
+When installed globally, `devhooks init` writes hooks that call `devhooks` via
+`$PATH`. When installed locally, hooks call `vendor/bin/devhooks` instead.
+Both modes are detected automatically — no extra configuration needed.
+
+`init` writes `.git/hooks/pre-commit` and `.git/hooks/pre-push` and can be
+re-run at any time to update the hooks to the latest version.
+
+> **Note:** `.git/hooks/` is never committed to the repository. Each developer
+> needs to run `devhooks init` once after cloning, regardless of whether they
+> use a local or global installation.
 
 ## Commands
 
 | Command | Description |
 |---|---|
 | `devhooks init` | Install/update git hooks in `.git/hooks/` |
+| `devhooks remove` | Remove devhooks-managed hooks from `.git/hooks/` |
 | `devhooks pre-commit` | Run fast checks on staged files only |
 | `devhooks pre-push` | Run full suite + main-divergence check |
 
 You can also invoke the commands directly without going through the git hook:
 
 ```bash
+# local install
 vendor/bin/devhooks pre-commit
-vendor/bin/devhooks pre-push
+
+# global install
+devhooks pre-commit
 ```
 
 ## What runs when
@@ -109,8 +133,13 @@ DEVHOOKS_MAIN_BRANCH=master git push
 Re-run `init` after updating the package to refresh the hook files:
 
 ```bash
+# local install
 composer update rokde/devhooks
 vendor/bin/devhooks init
+
+# global install
+composer global update rokde/devhooks
+devhooks init
 ```
 
 ## Project structure
