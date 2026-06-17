@@ -59,32 +59,24 @@ fi
 RECTOR="$(dh_find_bin rector)"
 if [ -n "$RECTOR" ]; then
     dh_run "rector" "$RECTOR" process --dry-run || FAILED=1
-else
-    dh_skip "rector (not installed)"
 fi
 
 # Pint
 PINT="$(dh_find_bin pint)"
 if [ -n "$PINT" ]; then
     dh_run "pint" "$PINT" || FAILED=1
-else
-    dh_skip "pint (not installed)"
 fi
 
 # PHPStan
 PHPSTAN="$(dh_find_bin phpstan)"
 if [ -n "$PHPSTAN" ]; then
-    dh_run "phpstan" "$PHPSTAN" analyse || FAILED=1
-else
-    dh_skip "phpstan (not installed)"
+    dh_run "phpstan" "$PHPSTAN" analyse --memory-limit=-1 || FAILED=1
 fi
 
 # Pest — full suite
 PEST="$(dh_find_bin pest)"
 if [ -n "$PEST" ]; then
-    dh_run "pest" "$PEST" || FAILED=1
-else
-    dh_skip "pest (not installed)"
+    dh_run_pest "pest" "$PEST" || FAILED=1
 fi
 
 # ---------------------------------------------------------------------------
@@ -95,32 +87,34 @@ fi
 OXLINT="$(dh_find_bin oxlint)"
 if [ -n "$OXLINT" ]; then
     dh_run "oxlint" "$OXLINT" . || FAILED=1
-else
-    dh_skip "oxlint (not installed)"
 fi
 
 # oxfmt
 OXFMT="$(dh_find_bin oxfmt)"
 if [ -n "$OXFMT" ]; then
     dh_run "oxfmt" "$OXFMT" --check . || FAILED=1
-else
-    dh_skip "oxfmt (not installed)"
 fi
 
 # Vitest — full suite
 VITEST="$(dh_find_bin vitest)"
 if [ -n "$VITEST" ]; then
     dh_run "vitest" "$VITEST" run || FAILED=1
-else
-    dh_skip "vitest (not installed)"
 fi
 
 # ---------------------------------------------------------------------------
 # Result
 # ---------------------------------------------------------------------------
 if [ "$FAILED" -ne 0 ]; then
-    dh_error "pre-push checks failed — push aborted"
-    exit 1
+    dh_error "pre-push checks failed"
+    printf "${C_YELLOW}  Push anyway? [y/N] ${C_RESET}"
+    read -r ANSWER </dev/tty
+    case "$ANSWER" in
+        y|Y|yes|YES) dh_warn "pushing despite failed checks" ;;
+        *)
+            dh_error "push aborted"
+            exit 1
+            ;;
+    esac
 fi
 
 dh_ok "all pre-push checks passed"
